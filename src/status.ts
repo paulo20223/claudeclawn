@@ -1,0 +1,143 @@
+import { join } from "path";
+import { readdir, readFile } from "fs/promises";
+import { homedir } from "os";
+
+const CLAUDE_DIR = join(process.cwd(), ".claude");
+const HEARTBEAT_DIR = join(CLAUDE_DIR, "heartbeat");
+const PID_FILE = join(HEARTBEAT_DIR, "daemon.pid");
+const STATE_FILE = join(HEARTBEAT_DIR, "state.json");
+const SETTINGS_FILE = join(HEARTBEAT_DIR, "settings.json");
+const JOBS_DIR = join(HEARTBEAT_DIR, "jobs");
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "now!";
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return "<1m";
+}
+
+function decodePath(encoded: string): string {
+  // e.g. "-home-moaz-claude-heartbeat" → try to resolve actual path
+  // Replace leading dash with /, then try each dash as a potential /
+  // We validate by checking if .claude/heartbeat/daemon.pid exists there
+  return "/" + encoded.slice(1).replace(/-/g, "/");
+}
+
+async function findAllDaemons(): Promise<{ path: string; pid: string }[]> {
+  const projectsDir = join(homedir(), ".claude", "projects");
+  const results: { path: string; pid: string }[] = [];
+
+  let dirs: string[];
+  try {
+    dirs = await readdir(projectsDir);
+  } catch {
+    return results;
+  }
+
+  for (const dir of dirs) {
+    // Try to find daemon.pid in each possible project path
+    // The dir name is an encoded path, but we can just scan for pid files directly
+    const candidatePath = decodePath(dir);
+    const pidFile = join(candidatePath, ".claude", "heartbeat", "daemon.pid");
+
+    try {
+      const pid = (await readFile(pidFile, "utf-8")).trim();
+      // Check if process is alive
+      process.kill(Number(pid), 0);
+      results.push({ path: candidatePath, pid });
+    } catch {
+      // no pid file or process dead
+    }
+  }
+
+  return results;
+}
+
+async function showAll(): Promise<void> {
+  const daemons = await findAllDaemons();
+
+  if (daemons.length === 0) {
+    console.log(`\x1b[31m○ No running daemons found\x1b[0m`);
+    return;
+  }
+
+  console.log(`Found ${daemons.length} running daemon(s):\n`);
+  for (const d of daemons) {
+    console.log(`\x1b[32m● Running\x1b[0m PID ${d.pid} — ${d.path}`);
+  }
+}
+
+async function main(): Promise<boolean> {
+  // Check daemon process
+  let daemonRunning = false;
+  let pid = "";
+  try {
+    pid = (await Bun.file(PID_FILE).text()).trim();
+    process.kill(Number(pid), 0);
+    daemonRunning = true;
+  } catch {
+    // not running or no pid file
+  }
+
+  if (!daemonRunning) {
+    console.log(`\x1b[31m○ Daemon is not running\x1b[0m`);
+    return false;
+  }
+
+  // Running — show full status
+  console.log(`\x1b[32m● Daemon is running\x1b[0m (PID ${pid})`);
+
+  try {
+    const settings = await Bun.file(SETTINGS_FILE).json();
+    const hb = settings.heartbeat;
+    console.log(
+      `  Heartbeat: ${hb.enabled ? `every ${hb.interval}m` : "disabled"}`
+    );
+  } catch {}
+
+  try {
+    const files = await readdir(JOBS_DIR);
+    const mdFiles = files.filter((f) => f.endsWith(".md"));
+    if (mdFiles.length > 0) {
+      console.log(`  Jobs: ${mdFiles.length}`);
+      for (const f of mdFiles) {
+        const content = await Bun.file(join(JOBS_DIR, f)).text();
+        const match = content.match(/schedule:\s*["']?([^"'\n]+)/);
+        const schedule = match ? match[1].trim() : "unknown";
+        console.log(`    - ${f.replace(/\.md$/, "")} [${schedule}]`);
+      }
+    }
+  } catch {}
+
+  try {
+    const state = await Bun.file(STATE_FILE).json();
+    const now = Date.now();
+    console.log("");
+    if (state.heartbeat) {
+      console.log(
+        `  \x1b[31m♥\x1b[0m Next heartbeat: ${formatCountdown(state.heartbeat.nextAt - now)}`
+      );
+    }
+    for (const job of state.jobs || []) {
+      console.log(
+        `  → ${job.name}: ${formatCountdown(job.nextAt - now)}`
+      );
+    }
+  } catch {}
+
+  return true;
+}
+
+// CLI entry
+const args = process.argv.slice(2);
+
+if (args.includes("--all")) {
+  showAll();
+} else {
+  main().then((running) => {
+    process.exit(running ? 0 : 1);
+  });
+}

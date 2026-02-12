@@ -1,5 +1,6 @@
-import { readdir, writeFile, unlink, mkdir } from "fs/promises";
+import { readdir, writeFile, unlink, mkdir, readFile } from "fs/promises";
 import { join } from "path";
+import { homedir } from "os";
 import { run } from "./runner";
 import { writeState, type StateData } from "./statusline";
 
@@ -239,6 +240,48 @@ async function stopDaemon() {
   process.exit(0);
 }
 
+// --- Stop all daemons across all projects ---
+
+async function stopAllDaemons() {
+  const projectsDir = join(homedir(), ".claude", "projects");
+  let dirs: string[];
+  try {
+    dirs = await readdir(projectsDir);
+  } catch {
+    console.log("No projects found.");
+    process.exit(0);
+  }
+
+  let found = 0;
+  for (const dir of dirs) {
+    const projectPath = "/" + dir.slice(1).replace(/-/g, "/");
+    const pidFile = join(projectPath, ".claude", "heartbeat", "daemon.pid");
+
+    let pid: string;
+    try {
+      pid = (await readFile(pidFile, "utf-8")).trim();
+      process.kill(Number(pid), 0); // check alive
+    } catch {
+      continue;
+    }
+
+    found++;
+    try {
+      process.kill(Number(pid), "SIGTERM");
+      console.log(`\x1b[33m■ Stopped\x1b[0m PID ${pid} — ${projectPath}`);
+      try { await unlink(pidFile); } catch {}
+    } catch {
+      console.log(`\x1b[31m✗ Failed to stop\x1b[0m PID ${pid} — ${projectPath}`);
+    }
+  }
+
+  if (found === 0) {
+    console.log("No running daemons found.");
+  }
+
+  process.exit(0);
+}
+
 // --- Main ---
 
 interface Settings {
@@ -316,7 +359,9 @@ async function main() {
   }, 60_000);
 }
 
-if (process.argv.includes("--stop")) {
+if (process.argv.includes("--stop-all")) {
+  stopAllDaemons();
+} else if (process.argv.includes("--stop")) {
   stopDaemon();
 } else {
   main();

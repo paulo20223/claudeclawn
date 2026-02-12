@@ -4,7 +4,7 @@ description: Start the heartbeat daemon
 
 Start the heartbeat daemon for this project. Follow these steps exactly:
 
-1. **Check if already running**: Read `.claude/heartbeat/daemon.pid`. If it exists, check if the process is alive with `kill -0 <pid>`. If alive, tell the user the daemon is already running and exit.
+1. **Check if already running**: Run `bun run ${CLAUDE_PLUGIN_ROOT}/src/status.ts`. If it reports the daemon is running, tell the user and exit.
 
 2. **Ensure Bun is installed**: Run `which bun`. If it's not found:
    - Tell the user Bun is required and will be auto-installed.

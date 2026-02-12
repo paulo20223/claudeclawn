@@ -167,6 +167,7 @@ export async function start() {
     }
 
     const ms = currentSettings.heartbeat.interval * 60_000;
+    nextHeartbeatAt = 0;
 
     function tick() {
       run("heartbeat", currentSettings.heartbeat.prompt).then((r) => forwardToTelegram("", r));

@@ -5,7 +5,7 @@ import { getPidPath, cleanupPidFile } from "../pid";
 import { resetSession } from "../sessions";
 
 const CLAUDE_DIR = join(process.cwd(), ".claude");
-const HEARTBEAT_DIR = join(CLAUDE_DIR, "heartbeat");
+const HEARTBEAT_DIR = join(CLAUDE_DIR, "claudeclaw");
 const STATUSLINE_FILE = join(CLAUDE_DIR, "statusline.cjs");
 const CLAUDE_SETTINGS_FILE = join(CLAUDE_DIR, "settings.json");
 
@@ -68,7 +68,7 @@ export async function stopAll() {
   let found = 0;
   for (const dir of dirs) {
     const projectPath = "/" + dir.slice(1).replace(/-/g, "/");
-    const pidFile = join(projectPath, ".claude", "heartbeat", "daemon.pid");
+    const pidFile = join(projectPath, ".claude", "claudeclaw", "daemon.pid");
 
     let pid: string;
     try {

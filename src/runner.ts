@@ -3,7 +3,7 @@ import { join } from "path";
 import { getOrCreateSession } from "./sessions";
 import { getSettings, type SecurityConfig } from "./config";
 
-const LOGS_DIR = join(process.cwd(), ".claude/heartbeat/logs");
+const LOGS_DIR = join(process.cwd(), ".claude/claudeclaw/logs");
 const SYSTEM_PROMPT_FILE = join(process.cwd(), "prompts", "claudeclaw.md");
 
 export interface RunResult {

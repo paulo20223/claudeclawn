@@ -4,7 +4,7 @@ description: Show heartbeat plugin help
 
 Display this help information to the user:
 
-**Claude Heartbeat** — a cron-like daemon that runs Claude prompts on a schedule.
+**ClaudeClaw** — a cron-like daemon that runs Claude prompts on a schedule.
 
 **Commands:**
 - `/heartbeat:start` — Initialize config and start the daemon
@@ -20,12 +20,12 @@ Display this help information to the user:
 **How it works:**
 - The daemon runs in the background checking your schedule every 60 seconds
 - A **heartbeat** prompt runs at a fixed interval (default: every 15 minutes)
-- **Jobs** are markdown files in `.claude/heartbeat/jobs/` with cron schedules
+- **Jobs** are markdown files in `.claude/claudeclaw/jobs/` with cron schedules
 - The statusline shows a live countdown to the next run
 
 **Configuration:**
-- `.claude/heartbeat/settings.json` — Main config (heartbeat interval, prompt, enabled)
-- `.claude/heartbeat/jobs/*.md` — Cron jobs with schedule frontmatter and a prompt body
+- `.claude/claudeclaw/settings.json` — Main config (heartbeat interval, prompt, enabled)
+- `.claude/claudeclaw/jobs/*.md` — Cron jobs with schedule frontmatter and a prompt body
 
 **Job file format:**
 ```markdown
@@ -42,6 +42,6 @@ Schedule uses standard cron syntax: `minute hour day-of-month month day-of-week`
 **Telegram bot:**
 - A standalone process that bridges Telegram messages to Claude sessions
 - Each Telegram user gets a persistent Claude session (with full skill/MCP/plugin support)
-- Configure in `.claude/heartbeat/settings.json` under `telegram` key
+- Configure in `.claude/claudeclaw/settings.json` under `telegram` key
 - Run with: `bun run telegram` (separate from the daemon)
 - Users can send `/reset` in Telegram to start a fresh session

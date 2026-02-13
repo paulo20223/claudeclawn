@@ -2,7 +2,7 @@ import { join, isAbsolute } from "path";
 import { mkdir } from "fs/promises";
 import { existsSync } from "fs";
 
-const HEARTBEAT_DIR = join(process.cwd(), ".claude", "heartbeat");
+const HEARTBEAT_DIR = join(process.cwd(), ".claude", "claudeclaw");
 const SETTINGS_FILE = join(HEARTBEAT_DIR, "settings.json");
 const JOBS_DIR = join(HEARTBEAT_DIR, "jobs");
 const LOGS_DIR = join(HEARTBEAT_DIR, "logs");

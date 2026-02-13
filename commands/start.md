@@ -17,7 +17,7 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
    - Verify `bun` is now available with `which bun`. If still not found, tell the user installation failed and to install manually from https://bun.sh, then exit.
    - Tell the user Bun was auto-installed successfully.
 
-2. **Check existing config**: Read `.claude/heartbeat/settings.json` (if it exists). Determine which sections are already configured:
+2. **Check existing config**: Read `.claude/claudeclaw/settings.json` (if it exists). Determine which sections are already configured:
    - **Heartbeat configured** = `heartbeat.enabled` is `true` AND `heartbeat.prompt` is non-empty
    - **Telegram configured** = `telegram.token` is non-empty
    - **Security configured** = `security.level` exists and is not `"moderate"` (the default), OR `security.allowedTools`/`security.disallowedTools` are non-empty
@@ -72,16 +72,16 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
      - "Allow any specific tools on top of the security level? (e.g. Bash(git:*) to allow only git commands)" (header: "Allow tools", options: "None — use level defaults (Recommended)", "Bash(git:*) — git only", "Bash(git:*) Bash(npm:*) — git + npm")
      - If they pick an option with tools or type custom ones, set `security.allowedTools` to the list.
 
-   Update `.claude/heartbeat/settings.json` with their answers.
+   Update `.claude/claudeclaw/settings.json` with their answers.
 
 5. **Launch daemon**: The daemon auto-initializes config and has a built-in safeguard against duplicate instances. Start it in the background:
    ```bash
-   mkdir -p .claude/heartbeat/logs && nohup bun run ${CLAUDE_PLUGIN_ROOT}/src/index.ts > .claude/heartbeat/logs/daemon.log 2>&1 & echo $!
+   mkdir -p .claude/claudeclaw/logs && nohup bun run ${CLAUDE_PLUGIN_ROOT}/src/index.ts > .claude/claudeclaw/logs/daemon.log 2>&1 & echo $!
    ```
    Use the description "🦞 Starting ClaudeClaw server" for this command.
-   Wait 1 second, then check `cat .claude/heartbeat/logs/daemon.log`. If it contains "Aborted: daemon already running", tell the user and exit.
+   Wait 1 second, then check `cat .claude/claudeclaw/logs/daemon.log`. If it contains "Aborted: daemon already running", tell the user and exit.
 
-6. **Capture session ID**: Read `.claude/heartbeat/session.json` and extract the `sessionId` field. This is the shared Claude session used by the daemon for heartbeat, jobs, and Telegram.
+6. **Capture session ID**: Read `.claude/claudeclaw/session.json` and extract the `sessionId` field. This is the shared Claude session used by the daemon for heartbeat, jobs, and Telegram.
 
 7. **Report**: Print the ASCII art below then show the PID, session, and status info.
 
@@ -116,7 +116,7 @@ The daemon hot-reloads settings and jobs every 30 seconds — no restart needed.
 
 ## Reference: File Formats
 
-### Settings — `.claude/heartbeat/settings.json`
+### Settings — `.claude/claudeclaw/settings.json`
 ```json
 {
   "heartbeat": {
@@ -156,7 +156,7 @@ All levels run without permission prompts (headless). Security is enforced via t
 | `moderate` | All tools | Yes — project dir only |
 | `unrestricted` | All tools | No — full system access |
 
-### Jobs — `.claude/heartbeat/jobs/<name>.md`
+### Jobs — `.claude/claudeclaw/jobs/<name>.md`
 Jobs are markdown files with cron schedule frontmatter and a prompt body:
 ```markdown
 ---
@@ -166,4 +166,4 @@ Your prompt here. Claude will run this at the scheduled time.
 ```
 - Schedule uses standard cron syntax: `minute hour day-of-month month day-of-week`
 - The filename (without `.md`) becomes the job name
-- Jobs are loaded at daemon startup from `.claude/heartbeat/jobs/`
+- Jobs are loaded at daemon startup from `.claude/claudeclaw/jobs/`

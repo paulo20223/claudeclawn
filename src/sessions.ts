@@ -2,7 +2,7 @@ import { join } from "path";
 import { unlink, readdir, rename } from "fs/promises";
 import { randomUUID } from "crypto";
 
-const HEARTBEAT_DIR = join(process.cwd(), ".claude", "heartbeat");
+const HEARTBEAT_DIR = join(process.cwd(), ".claude", "claudeclaw");
 const SESSION_FILE = join(HEARTBEAT_DIR, "session.json");
 
 interface GlobalSession {

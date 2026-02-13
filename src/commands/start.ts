@@ -9,7 +9,7 @@ import { initConfig, loadSettings, reloadSettings, resolvePrompt, type Settings 
 import type { Job } from "../jobs";
 
 const CLAUDE_DIR = join(process.cwd(), ".claude");
-const HEARTBEAT_DIR = join(CLAUDE_DIR, "heartbeat");
+const HEARTBEAT_DIR = join(CLAUDE_DIR, "claudeclaw");
 const STATUSLINE_FILE = join(CLAUDE_DIR, "statusline.cjs");
 const CLAUDE_SETTINGS_FILE = join(CLAUDE_DIR, "settings.json");
 
@@ -19,7 +19,7 @@ const STATUSLINE_SCRIPT = `#!/usr/bin/env node
 const { readFileSync } = require("fs");
 const { join } = require("path");
 
-const STATE_FILE = join(__dirname, "heartbeat", "state.json");
+const STATE_FILE = join(__dirname, "claudeclaw", "state.json");
 
 function formatCountdown(ms) {
   if (ms <= 0) return "now!";
@@ -108,7 +108,7 @@ export async function start() {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 
-  console.log("Claude Heartbeat daemon started");
+  console.log("ClaudeClaw daemon started");
   console.log(`  PID: ${process.pid}`);
   console.log(`  Security: ${settings.security.level}`);
   if (settings.security.allowedTools.length > 0)

@@ -32,6 +32,7 @@
 ## Commit & Pull Request Guidelines
 - Follow current history style: short, imperative commit messages (e.g., `add dev:web watch script`, `sync heartbeat toggle with daemon state immediately`).
 - Keep commits scoped to one logical change.
+- Commit directly after every small edit; do not wait.
 - PRs should include:
   - What changed and why.
   - Commands run for verification.

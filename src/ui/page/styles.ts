@@ -118,8 +118,8 @@ export const pageStyles = String.raw`    :root {
     }
 
     .time {
-      display: inline-block;
-      min-width: 11ch;
+      display: block;
+      width: 100%;
       font-family: "Fraunces", serif;
       font-size: clamp(4.2rem, 15vw, 10rem);
       line-height: 0.95;

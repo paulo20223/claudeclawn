@@ -6,7 +6,6 @@ import { cronMatches, nextCronMatch } from "../cron";
 import { loadJobs } from "../jobs";
 import { writePidFile, cleanupPidFile, checkExistingDaemon } from "../pid";
 import { initConfig, loadSettings, reloadSettings, resolvePrompt, type Settings } from "../config";
-import { preflight } from "../preflight";
 import { startWebUi, type WebServerHandle } from "../web";
 import type { Job } from "../jobs";
 
@@ -313,6 +312,20 @@ export async function start(args: string[] = []) {
   // --- Helpers ---
   function ts() { return new Date().toLocaleTimeString(); }
 
+  function startPreflightInBackground(projectPath: string): void {
+    try {
+      const proc = Bun.spawn([process.execPath, "run", "src/preflight.ts", projectPath], {
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "ignore",
+      });
+      proc.unref();
+      console.log(`[${ts()}] Plugin preflight started in background`);
+    } catch (err) {
+      console.error(`[${ts()}] Failed to start plugin preflight:`, err);
+    }
+  }
+
   function forwardToTelegram(label: string, result: { exitCode: number; stdout: string; stderr: string }) {
     if (!telegramSend || currentSettings.telegram.allowedUserIds.length === 0) return;
     const text = result.exitCode === 0
@@ -374,8 +387,8 @@ export async function start(args: string[] = []) {
     await bootstrap();
   }
 
-  // Install plugins that aren't already present
-  preflight(process.cwd());
+  // Install plugins without blocking daemon startup.
+  startPreflightInBackground(process.cwd());
 
   if (currentSettings.heartbeat.enabled) scheduleHeartbeat();
 

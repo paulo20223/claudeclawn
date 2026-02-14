@@ -57,11 +57,9 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
 
    Then, based on their answers:
 
-   - **If yes to heartbeat**: Use AskUserQuestion again with two questions:
-     - "What prompt should the heartbeat run on each check? (You can enter an inline prompt OR a file path ending in .md/.txt/.prompt)" (header: "Prompt", options: provide 2-3 example prompts relevant to the project)
+   - **If yes to heartbeat**: Use AskUserQuestion again with one question:
      - "How often should it run in minutes?" (header: "Interval", options: "5", "15 (Recommended)", "30", "60")
-     - Set `heartbeat.enabled` to `true`, `heartbeat.prompt` to their answer, `heartbeat.interval` to their answer.
-     - Note: If the user provides a path ending in `.md`, `.txt`, or `.prompt`, the daemon will read the prompt from that file at each tick. Relative paths resolve from the project root. If the file is not found, the value is used as a literal string.
+     - Set `heartbeat.enabled` to `true` and `heartbeat.interval` to their answer.
 
    - **If yes to Telegram**: Use AskUserQuestion again with two questions:
      - "What is your Telegram bot token?" (header: "Bot token", options: let user type via Other)

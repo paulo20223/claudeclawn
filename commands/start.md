@@ -79,25 +79,10 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
 
    Update `.claude/claudeclaw/settings.json` with their answers.
 
-6. **First contact destination**: Use AskUserQuestion to ask where they want first contact to fire. Build options **dynamically** based on whether Telegram was configured in step 5:
-
-   - **If Telegram IS configured** (header: "First contact"):
-     - "Open in Claude Code (Recommended)" (description: "Meet your agent in Claude Code after launch")
-     - "Fire to Telegram" (description: "Send first contact to Telegram after launch")
-
-   - **If Telegram is NOT configured** (header: "First contact"):
-     - "Open in Claude Code (Recommended)" (description: "Meet your agent in Claude Code after launch")
-     - "Skip" (description: "Skip for now — daemon keeps running, you can connect later")
-
-7. **Launch/start action**: Run command based on step 6 choice:
-   - **If user chose "Fire to Telegram"**:
-     ```bash
-     mkdir -p .claude/claudeclaw/logs && nohup bun run ${CLAUDE_PLUGIN_ROOT}/src/index.ts start --web --trigger --telegram > .claude/claudeclaw/logs/daemon.log 2>&1 & echo $!
-     ```
-   - **Otherwise**:
-     ```bash
-     mkdir -p .claude/claudeclaw/logs && nohup bun run ${CLAUDE_PLUGIN_ROOT}/src/index.ts start --web > .claude/claudeclaw/logs/daemon.log 2>&1 & echo $!
-     ```
+6. **Launch/start action**:
+   ```bash
+   mkdir -p .claude/claudeclaw/logs && nohup bun run ${CLAUDE_PLUGIN_ROOT}/src/index.ts start --web > .claude/claudeclaw/logs/daemon.log 2>&1 & echo $!
+   ```
    Use the description "Starting ClaudeClaw server" for this command.
    Wait 1 second, then check `cat .claude/claudeclaw/logs/daemon.log`. If it contains "Aborted: daemon already running", tell the user and exit.
    - Read `.claude/claudeclaw/settings.json` for `web.port` (default `4632` if missing) and `web.host` (default `127.0.0.1`).
@@ -106,9 +91,9 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
      - macOS: `open http://<HOST>:<PORT>`
      - If open command fails, print the URL clearly so user can open it manually.
 
-8. **Capture session ID**: Read `.claude/claudeclaw/session.json` and extract the `sessionId` field. This is the shared Claude session used by the daemon for heartbeat, jobs, and Telegram.
+7. **Capture session ID**: Read `.claude/claudeclaw/session.json` and extract the `sessionId` field. This is the shared Claude session used by the daemon for heartbeat, jobs, and Telegram.
 
-9. **Report**: Print the ASCII art below then show the PID, session, status info, one-shot usage tips, and the Web UI URL.
+8. **Report**: Print the ASCII art below then show the PID, session, status info, Telegram bot next step, and the Web UI URL.
 
 CRITICAL: Output the ASCII art block below EXACTLY as-is inside a markdown code block. Do NOT re-indent, re-align, or adjust ANY whitespace. Copy every character verbatim. Only replace `<PID>` and `<WORKING_DIR>` with actual values.
 
@@ -129,11 +114,8 @@ CRITICAL: Output the ASCII art block below EXACTLY as-is inside a markdown code 
 /heartbeat:config  - show config
 ```
 
-**Talk to your agent anytime from Claude Code**
-```bash
-cd <WORKING_DIR> && claude --resume <SESSION_ID>
-```
-Replace `<WORKING_DIR>` with the real project directory and `<SESSION_ID>` with the session ID captured in step 8.
+**To start chatting on Telegram**
+Go to your bot, send `/start`, and start talking.
 
 Show this direct Web UI URL:
 ```bash

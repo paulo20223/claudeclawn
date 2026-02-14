@@ -259,7 +259,7 @@ function htmlPage(): string {
 
     .logo-svg {
       display: block;
-      width: min(360px, 88vw);
+      width: min(300px, 80vw);
       height: auto;
       margin: 0 auto 18px;
       filter: drop-shadow(0 8px 20px #00000040);
@@ -267,8 +267,8 @@ function htmlPage(): string {
     .logo-svg text {
       fill: #dbe7ff;
       font-family: "JetBrains Mono", monospace;
-      font-size: 22px;
-      letter-spacing: 0.4px;
+      font-size: 20px;
+      letter-spacing: 0;
     }
 
     @keyframes rise {
@@ -358,11 +358,11 @@ function htmlPage(): string {
   <div class="grain" aria-hidden="true"></div>
   <main class="stage">
     <section class="hero">
-      <svg class="logo-svg" viewBox="0 0 430 130" role="img" aria-label="Lobster ASCII art logo">
-        <text x="8" y="28" xml:space="preserve">🦞         🦞</text>
-        <text x="8" y="58" xml:space="preserve">   ▐▛███▜▌</text>
-        <text x="8" y="88" xml:space="preserve">  ▝▜█████▛▘</text>
-        <text x="8" y="118" xml:space="preserve">    ▘▘ ▝▝</text>
+      <svg class="logo-svg" viewBox="0 0 300 130" role="img" aria-label="Lobster ASCII art logo">
+        <text x="150" y="28" text-anchor="middle" xml:space="preserve">🦞         🦞</text>
+        <text x="150" y="58" text-anchor="middle" xml:space="preserve">   ▐▛███▜▌</text>
+        <text x="150" y="88" text-anchor="middle" xml:space="preserve">  ▝▜█████▛▘</text>
+        <text x="150" y="118" text-anchor="middle" xml:space="preserve">    ▘▘ ▝▝</text>
       </svg>
       <div class="time" id="clock">--:--:--</div>
       <div class="date" id="date">Loading date...</div>

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
+    "dev:web": "bun --watch src/index.ts start --web",
     "telegram": "bun run src/index.ts telegram",
     "status": "bun run src/index.ts status"
   },

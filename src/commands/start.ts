@@ -270,20 +270,43 @@ export async function start(args: string[] = []) {
   await initTelegram(currentSettings.telegram.token);
   if (!telegramToken) console.log("  Telegram: not configured");
 
+  function isAddrInUse(err: unknown): boolean {
+    if (!err || typeof err !== "object") return false;
+    const code = "code" in err ? String((err as { code?: unknown }).code) : "";
+    const message = "message" in err ? String((err as { message?: unknown }).message) : "";
+    return code === "EADDRINUSE" || message.includes("EADDRINUSE");
+  }
+
+  function startWebWithFallback(host: string, preferredPort: number): WebServerHandle {
+    const maxAttempts = 10;
+    let lastError: unknown;
+    for (let i = 0; i < maxAttempts; i++) {
+      const candidatePort = preferredPort + i;
+      try {
+        return startWebUi({
+          host,
+          port: candidatePort,
+          getSnapshot: () => ({
+            pid: process.pid,
+            startedAt: daemonStartedAt,
+            heartbeatNextAt: nextHeartbeatAt,
+            settings: currentSettings,
+            jobs: currentJobs,
+          }),
+        });
+      } catch (err) {
+        lastError = err;
+        if (!isAddrInUse(err) || i === maxAttempts - 1) throw err;
+      }
+    }
+
+    throw lastError;
+  }
+
   if (webEnabled) {
     currentSettings.web.enabled = true;
-    currentSettings.web.port = webPort;
-    web = startWebUi({
-      host: currentSettings.web.host,
-      port: currentSettings.web.port,
-      getSnapshot: () => ({
-        pid: process.pid,
-        startedAt: daemonStartedAt,
-        heartbeatNextAt: nextHeartbeatAt,
-        settings: currentSettings,
-        jobs: currentJobs,
-      }),
-    });
+    web = startWebWithFallback(currentSettings.web.host, webPort);
+    currentSettings.web.port = web.port;
     console.log(`[${new Date().toLocaleTimeString()}] Web UI listening on http://${web.host}:${web.port}`);
   }
 

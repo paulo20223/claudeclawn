@@ -146,7 +146,7 @@ ${pageStyles}
           <div class="quick-field quick-time-wrap">
             <div class="quick-label">Delay From Now (Minutes)</div>
             <div class="quick-input-wrap">
-              <input class="quick-input" id="quick-job-offset" type="number" min="1" max="1440" step="5" placeholder="10" required />
+            <input class="quick-input" id="quick-job-offset" type="number" min="1" max="1440" step="1" placeholder="10" required />
               <label class="quick-check quick-check-inline" for="quick-job-daily">
                 <input id="quick-job-daily" type="checkbox" checked />
                 <span>Daily</span>

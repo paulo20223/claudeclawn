@@ -656,7 +656,7 @@ function htmlPage(): string {
     }
 
     .pill {
-      min-height: 44px;
+      min-height: 54px;
       flex: 1 1 0;
       padding: 8px 10px;
       border-radius: 0;
@@ -667,10 +667,9 @@ function htmlPage(): string {
       font-size: 12px;
       letter-spacing: 0.01em;
       font-family: "JetBrains Mono", monospace;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+      display: grid;
+      align-content: center;
+      gap: 3px;
     }
     .pill:last-child {
       border-right: 0;
@@ -698,7 +697,6 @@ function htmlPage(): string {
       color: #f3f7ff;
       font-weight: 500;
       text-shadow: none;
-      white-space: nowrap;
     }
 
     .pill.ok { border-color: #67f0b542; }
@@ -720,7 +718,7 @@ function htmlPage(): string {
       }
       .pill {
         font-size: 11px;
-        min-height: 44px;
+        min-height: 50px;
         flex: 1 1 50%;
         border-right: 0;
         border-bottom: 0;

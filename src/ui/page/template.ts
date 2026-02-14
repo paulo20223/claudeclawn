@@ -125,9 +125,9 @@ ${pageStyles}
               <button class="quick-add" type="button" data-add-minutes="180">+3h</button>
             </div>
             <div class="quick-preview" id="quick-job-preview">Runs in -- min</div>
-            <label class="quick-label" for="quick-job-daily">
+            <label class="quick-check" for="quick-job-daily">
               <input id="quick-job-daily" type="checkbox" checked />
-              Daily
+              <span>Daily</span>
             </label>
           </div>
           <div class="quick-field">

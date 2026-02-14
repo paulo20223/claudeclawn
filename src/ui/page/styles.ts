@@ -267,6 +267,42 @@ export const pageStyles = String.raw`    :root {
       font-size: 11px;
       color: #a8f1ca;
     }
+    .quick-check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      min-height: 29px;
+      padding: 0 12px;
+      border: 1px solid #ff7f7f55;
+      border-radius: 999px;
+      background: #34181855;
+      color: #ff9b9b;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+      user-select: none;
+    }
+    .quick-check:hover {
+      transform: translateY(-1px);
+    }
+    .quick-check:has(input:checked) {
+      background: #11342455;
+      border-color: #67f0b560;
+      color: #67f0b5;
+    }
+    .quick-check input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .quick-check:focus-within {
+      outline: 1px solid #7dc5ff88;
+      outline-offset: 2px;
+    }
     .quick-prompt {
       width: 100%;
       min-height: 106px;

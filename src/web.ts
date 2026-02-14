@@ -656,9 +656,9 @@ function htmlPage(): string {
     }
 
     .pill {
-      min-height: 56px;
+      min-height: 44px;
       flex: 1 1 0;
-      padding: 8px 12px;
+      padding: 8px 10px;
       border-radius: 0;
       border: 0;
       border-right: 0;
@@ -667,9 +667,10 @@ function htmlPage(): string {
       font-size: 12px;
       letter-spacing: 0.01em;
       font-family: "JetBrains Mono", monospace;
-      display: grid;
-      align-content: center;
-      gap: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }
     .pill:last-child {
       border-right: 0;
@@ -685,20 +686,19 @@ function htmlPage(): string {
       opacity: 0.75;
     }
     .pill-icon {
+      width: 14px;
+      min-width: 14px;
+      text-align: center;
       font-size: 11px;
+      line-height: 1;
       opacity: 0.9;
     }
     .pill-value {
-      font-size: 13px;
+      font-size: 12px;
       color: #f3f7ff;
       font-weight: 500;
       text-shadow: none;
-    }
-    .pill-meta {
-      font-size: 10px;
-      color: #cfdbee;
-      line-height: 1.2;
-      opacity: 0.7;
+      white-space: nowrap;
     }
 
     .pill.ok { border-color: #67f0b542; }
@@ -720,7 +720,7 @@ function htmlPage(): string {
       }
       .pill {
         font-size: 11px;
-        min-height: 52px;
+        min-height: 44px;
         flex: 1 1 50%;
         border-right: 0;
         border-bottom: 0;
@@ -921,7 +921,6 @@ function htmlPage(): string {
         icon: "🛡️",
         label: "Security",
         value: cap(state.security.level),
-        meta: "allowed " + (state.security.allowedTools?.length || 0) + " | blocked " + (state.security.disallowedTools?.length || 0),
       });
 
       pills.push({
@@ -969,11 +968,10 @@ function htmlPage(): string {
           '<div class="pill ' + p.cls + '">' +
             '<div class="pill-label"><span class="pill-icon">' + esc(p.icon || "") + "</span>" + esc(p.label) + '</div>' +
             '<div class="pill-value">' + esc(p.value) + '</div>' +
-            (p.meta ? ('<div class="pill-meta">' + esc(p.meta) + "</div>") : "") +
           "</div>"
         ).join("");
       } catch (err) {
-        dockEl.innerHTML = '<div class="pill bad"><div class="pill-label"><span class="pill-icon">⚠️</span>Status</div><div class="pill-value">Offline</div><div class="pill-meta">' + esc(String(err)) + '</div></div>';
+        dockEl.innerHTML = '<div class="pill bad"><div class="pill-label"><span class="pill-icon">⚠️</span>Status</div><div class="pill-value">Offline</div></div>';
       }
     }
 

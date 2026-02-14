@@ -265,9 +265,10 @@ function htmlPage(): string {
     }
     .logo-top {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      font-size: 20px;
+      gap: 8ch;
+      font-size: 18px;
       line-height: 1.1;
       margin-bottom: 2px;
     }

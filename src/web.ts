@@ -640,25 +640,25 @@ function htmlPage(): string {
       left: 50%;
       bottom: 24px;
       transform: translateX(-50%);
-      width: min(980px, calc(100% - 24px));
-      border: 1px solid #e6efff2b;
-      background: linear-gradient(180deg, #0d1728d9, #0a1320d9);
-      backdrop-filter: blur(8px);
-      border-radius: 20px;
-      padding: 10px 12px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap: 8px;
+      width: min(1020px, calc(100% - 24px));
+      padding: 6px 8px;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
       z-index: 2;
-      box-shadow: 0 16px 42px #00000059, inset 0 1px 0 #ffffff17;
     }
 
     .pill {
       min-height: 56px;
+      min-width: 178px;
       padding: 9px 11px;
-      border-radius: 13px;
-      border: 1px solid #ffffff1d;
-      background: linear-gradient(180deg, #101b2d, #0d1625);
+      border-radius: 18px;
+      border: 1px solid #ffffff35;
+      background:
+        radial-gradient(130% 95% at 15% 0%, #ffffff38 0%, #ffffff10 42%, transparent 60%),
+        linear-gradient(180deg, #ffffff2d 0%, #d5e7ff18 45%, #0f1b2d8f 100%);
+      backdrop-filter: blur(16px) saturate(1.2);
       color: #e7f0ff;
       font-size: 12px;
       letter-spacing: 0.01em;
@@ -666,23 +666,37 @@ function htmlPage(): string {
       display: grid;
       align-content: center;
       gap: 2px;
-      box-shadow: inset 0 1px 0 #ffffff10;
+      box-shadow:
+        inset 0 1px 0 #ffffff70,
+        inset 0 -10px 16px #0b142533,
+        0 10px 24px #00000042;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+    .pill:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        inset 0 1px 0 #ffffff88,
+        inset 0 -10px 16px #0b14254d,
+        0 14px 30px #0000004d;
     }
     .pill-label {
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #9fb4d4;
+      color: #cad8ee;
+      opacity: 0.9;
     }
     .pill-value {
       font-size: 13px;
-      color: #eaf2ff;
+      color: #f3f8ff;
       font-weight: 600;
+      text-shadow: 0 1px 0 #00000022;
     }
     .pill-meta {
       font-size: 10px;
-      color: #9fb4d4;
+      color: #c0d0e8;
       line-height: 1.2;
+      opacity: 0.9;
     }
 
     .pill.ok { border-color: #67f0b542; }

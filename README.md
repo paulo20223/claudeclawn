@@ -28,8 +28,7 @@ The setup wizard walks you through model, heartbeat, Telegram, and security — 
 
 - **Heartbeat** — periodic check-ins on a configurable interval with quiet hours support
 - **Cron Jobs** — schedule any prompt with standard cron syntax, timezone-aware
-- **Telegram Bot** — chat with your agent from anywhere, including voice messages
-- **Voice Transcription** — Whisper-powered speech-to-text for Telegram voice notes
+- **Telegram Bot** — chat with your agent from anywhere with text, images, and voice
 - **Web Dashboard** — monitor runs, edit jobs, view logs in real time
 - **Security Levels** — four granular levels from read-only to full system access
 - **Model Selection** — choose between Opus, Sonnet, or Haiku per project

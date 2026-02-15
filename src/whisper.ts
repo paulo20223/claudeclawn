@@ -26,6 +26,24 @@ function nowMs(): number {
   return Date.now();
 }
 
+function hasExecutableInPath(executable: string): boolean {
+  const probe = spawnSync(executable, ["--version"], { stdio: "ignore" });
+  return probe.status === 0 && !probe.error;
+}
+
+function assertWhisperBuildToolchain(): void {
+  if (process.platform !== "linux" && process.platform !== "darwin") return;
+  if (hasExecutableInPath("make")) return;
+  if (process.platform === "linux") {
+    throw new Error(
+      'Missing required build tool "make" for whisper.cpp. Install toolchain: sudo apt update && sudo apt install -y build-essential'
+    );
+  }
+  throw new Error(
+    'Missing required build tool "make" for whisper.cpp. Install Xcode Command Line Tools: xcode-select --install'
+  );
+}
+
 function isVersionAtLeast(version: string, minimum: string): boolean {
   const current = version.split(".").map((part) => Number.parseInt(part, 10) || 0);
   const required = minimum.split(".").map((part) => Number.parseInt(part, 10) || 0);
@@ -102,6 +120,7 @@ async function prepareWhisperAssets(printOutput: boolean): Promise<void> {
 
   const installStartedAt = nowMs();
   console.log("whisper warmup: installWhisperCpp begin");
+  assertWhisperBuildToolchain();
   await installWhisperCpp({
     version: WHISPER_CPP_VERSION,
     to: WHISPER_PATH,

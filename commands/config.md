@@ -188,7 +188,7 @@ Location: `.claude/claudeclaw/settings.json`
   "heartbeat": {
     "enabled": true,
     "interval": 15,
-    "prompt": "Check git status and summarize recent changes.",
+    "prompt": "Remind me to drink water and stretch.",
     "excludeWindows": [
       { "days": [0, 6], "start": "23:00", "end": "07:00" }
     ]

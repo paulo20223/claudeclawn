@@ -149,8 +149,8 @@ function startWhisperWarmupInBackground(): void {
   try {
     const proc = Bun.spawn([process.execPath, "run", WHISPER_WARMUP_SCRIPT], {
       stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore",
+      stdout: "inherit",
+      stderr: "inherit",
     });
     proc.unref();
     console.log("preflight: whisper warmup started in background");

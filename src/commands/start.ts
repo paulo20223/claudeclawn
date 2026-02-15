@@ -425,8 +425,8 @@ export async function start(args: string[] = []) {
     try {
       const proc = Bun.spawn([process.execPath, "run", PREFLIGHT_SCRIPT, projectPath], {
         stdin: "ignore",
-        stdout: "ignore",
-        stderr: "ignore",
+        stdout: "inherit",
+        stderr: "inherit",
       });
       proc.unref();
       console.log(`[${ts()}] Plugin preflight started in background`);

@@ -166,7 +166,7 @@ function debugLog(message: string): void {
 }
 
 function normalizeTelegramText(text: string): string {
-  return text.replace(/\u2014/g, "-");
+  return text.replace(/[\u2010-\u2015\u2212]/g, "-");
 }
 
 function getMessageTextAndEntities(message: TelegramMessage): {
@@ -261,7 +261,8 @@ async function callApi<T>(token: string, method: string, body?: Record<string, u
 }
 
 async function sendMessage(token: string, chatId: number, text: string): Promise<void> {
-  const html = markdownToTelegramHtml(text);
+  const normalized = normalizeTelegramText(text);
+  const html = markdownToTelegramHtml(normalized);
   const MAX_LEN = 4096;
   for (let i = 0; i < html.length; i += MAX_LEN) {
     try {
@@ -274,7 +275,7 @@ async function sendMessage(token: string, chatId: number, text: string): Promise
       // Fallback to plain text if HTML parsing fails
       await callApi(token, "sendMessage", {
         chat_id: chatId,
-        text: text.slice(i, i + MAX_LEN),
+        text: normalized.slice(i, i + MAX_LEN),
       });
     }
   }

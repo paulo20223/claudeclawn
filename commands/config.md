@@ -16,6 +16,8 @@ Parse `$ARGUMENTS` to identify what the user wants. If no arguments are given, s
    **General**
    - Model: (e.g. `opus`, `sonnet`, `haiku`, `glm` or "default")
    - API token: (first 5 chars + "..." or "not configured"; used when `model` is `glm`)
+   - Fallback model: (e.g. `glm`, `sonnet`, or "not configured")
+   - Fallback API token: (first 5 chars + "..." or "not configured")
    - Timezone: (e.g. `America/New_York` or "UTC")
 
    **Heartbeat**
@@ -119,6 +121,26 @@ Set or update the API token used when `model` is `glm`.
 4. Set top-level `api` to the new value.
 5. Write and confirm.
 
+### `fallback model <name>` / `fallback model`
+
+Set the fallback model used when the primary model hits a rate limit.
+
+1. If fallback model name is in `$ARGUMENTS`, use it directly.
+2. Otherwise, use **AskUserQuestion**: "Which fallback model should ClaudeClaw use?" (header: "Fallback model", options: "none (Recommended)", "sonnet", "haiku", "glm")
+3. Read `.claude/claudeclaw/settings.json`.
+4. Set `fallback.model` to the chosen value (`""` for none).
+5. Write and confirm.
+
+### `fallback api <token>` / `fallback api`
+
+Set or clear the API token for the fallback model.
+
+1. If token is in `$ARGUMENTS`, use it directly.
+2. Otherwise, use **AskUserQuestion**: "What API token should ClaudeClaw use for fallback model?" (header: "Fallback API token", options: let user type via Other)
+3. Read `.claude/claudeclaw/settings.json`.
+4. Set `fallback.api` to the new value.
+5. Write and confirm.
+
 ### `timezone <tz>` / `timezone`
 
 Set the IANA timezone (e.g. `America/New_York`, `Europe/London`, `UTC`).
@@ -175,6 +197,10 @@ Reset all settings to defaults.
    {
      "model": "",
      "api": "",
+     "fallback": {
+       "model": "",
+       "api": ""
+     },
      "timezone": "UTC",
      "timezoneOffsetMinutes": 0,
      "heartbeat": {
@@ -211,6 +237,10 @@ Location: `.claude/claudeclaw/settings.json`
 {
   "model": "opus",
   "api": "",
+  "fallback": {
+    "model": "glm",
+    "api": ""
+  },
   "timezone": "America/New_York",
   "timezoneOffsetMinutes": -300,
   "heartbeat": {
@@ -242,6 +272,8 @@ Location: `.claude/claudeclaw/settings.json`
 |----------------------------|------------|------------------------------------------------|
 | `model`                    | string     | Claude model (`opus`, `sonnet`, `haiku`, `glm`, or full ID). Empty = default |
 | `api`                      | string     | API token used when model is `glm` (mapped to `ANTHROPIC_AUTH_TOKEN`) |
+| `fallback.model`           | string     | Backup model used automatically if primary run returns rate-limit text |
+| `fallback.api`             | string     | API token used with `fallback.model` (optional) |
 | `timezone`                 | string     | IANA timezone name (e.g. `America/New_York`)   |
 | `timezoneOffsetMinutes`    | number     | UTC offset in minutes (auto-resolved from timezone) |
 | `heartbeat.enabled`        | boolean    | Whether the recurring heartbeat runs           |

@@ -126,7 +126,7 @@ Set or update the API token used when `model` is `glm`.
 Set the fallback model used when the primary model hits a rate limit.
 
 1. If fallback model name is in `$ARGUMENTS`, use it directly.
-2. Otherwise, use **AskUserQuestion**: "Which fallback model should ClaudeClaw use?" (header: "Fallback model", options: "none (Recommended)", "sonnet", "haiku", "glm")
+2. Otherwise, use **AskUserQuestion**: "Which fallback model should ClaudeClaw use?" (header: "Fallback model", options: "glm (Recommended)", "sonnet", "haiku")
 3. Read `.claude/claudeclaw/settings.json`.
 4. Set `fallback.model` to the chosen value (`""` for none).
 5. Write and confirm.
@@ -272,7 +272,7 @@ Location: `.claude/claudeclaw/settings.json`
 |----------------------------|------------|------------------------------------------------|
 | `model`                    | string     | Claude model (`opus`, `sonnet`, `haiku`, `glm`, or full ID). Empty = default |
 | `api`                      | string     | API token used when model is `glm` (mapped to `ANTHROPIC_AUTH_TOKEN`) |
-| `fallback.model`           | string     | Backup model used automatically if primary run returns rate-limit text |
+| `fallback.model`           | string     | Backup model used automatically if primary run returns rate-limit text (recommend `glm` for provider diversity) |
 | `fallback.api`             | string     | API token used with `fallback.model` (optional) |
 | `timezone`                 | string     | IANA timezone name (e.g. `America/New_York`)   |
 | `timezoneOffsetMinutes`    | number     | UTC offset in minutes (auto-resolved from timezone) |

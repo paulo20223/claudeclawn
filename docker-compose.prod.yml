@@ -1,0 +1,48 @@
+services:
+  claudeclaw:
+    build: .
+    expose:
+      - "4632"
+    volumes:
+      - ./claude-home:/home/claw/.claude
+      - ./data:/app/.claude/claudeclaw
+      - ./skills:/app/skills
+      - ./CLAUDE.md:/app/CLAUDE.md
+    command: ["bun", "run", "src/index.ts", "start", "--web"]
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDECLAW_WEB_TOKEN=${CLAUDECLAW_WEB_TOKEN:-}
+      - STT_URL=http://stt:8080
+      - VIRTUAL_HOST=claw.tenzorro.com
+      - VIRTUAL_PORT=4632
+      - LETSENCRYPT_HOST=claw.tenzorro.com
+    depends_on:
+      stt:
+        condition: service_healthy
+    networks:
+      - proxy
+      - default
+    restart: unless-stopped
+
+  stt:
+    image: ghcr.io/ggml-org/whisper.cpp:main
+    platform: linux/amd64
+    entrypoint: ["/bin/sh", "/stt-entrypoint.sh"]
+    volumes:
+      - ./stt-entrypoint.sh:/stt-entrypoint.sh:ro
+      - whisper-models:/models
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+volumes:
+  whisper-models:
+
+networks:
+  proxy:
+    external: true
+    name: nginx-proxy

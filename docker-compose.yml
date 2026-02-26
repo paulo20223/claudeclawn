@@ -1,0 +1,36 @@
+services:
+  claudeclaw:
+    build: .
+    ports:
+      - "4632:4632"
+    volumes:
+      - ./claude-home:/home/claw/.claude
+      - ./data:/app/.claude/claudeclaw
+      - ./skills:/app/skills
+      - ./CLAUDE.md:/app/CLAUDE.md
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDECLAW_WEB_TOKEN=${CLAUDECLAW_WEB_TOKEN:-}
+      - STT_URL=http://stt:8080
+    depends_on:
+      stt:
+        condition: service_healthy
+    restart: unless-stopped
+
+  stt:
+    image: ghcr.io/ggml-org/whisper.cpp:main
+    platform: linux/amd64
+    entrypoint: ["/bin/sh", "/stt-entrypoint.sh"]
+    volumes:
+      - ./stt-entrypoint.sh:/stt-entrypoint.sh:ro
+      - whisper-models:/models
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+volumes:
+  whisper-models:

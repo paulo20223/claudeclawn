@@ -1,0 +1,58 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Initial setup — build, choose language, authorize
+    cmds:
+      - task: build
+      - task: lang
+      - task: auth
+      - task: mtcute:auth
+
+  auth:
+    desc: Authorize Claude Code inside Docker container
+    cmd: docker compose run --rm claudeclaw claude login
+
+  lang:
+    desc: Set Claude Code language (ru/en)
+    vars:
+      LANG:
+        sh: |
+          echo ""
+          echo "  1) Русский"
+          echo "  2) English"
+          printf "  Choose language / Выберите язык [1]: " >&2
+          read choice
+          case "$choice" in
+            2) echo "en" ;;
+            *) echo "ru" ;;
+          esac
+    cmds:
+      - mkdir -p claude-home
+      - |
+        cat > claude-home/settings.json <<EOF
+        {
+          "preferredLanguage": "{{.LANG}}"
+        }
+        EOF
+      - echo "Language set to {{.LANG}}"
+
+  build:
+    desc: Build Docker image
+    cmd: docker compose build
+
+  up:
+    desc: Start service
+    cmd: docker compose up -d
+
+  down:
+    desc: Stop service
+    cmd: docker compose down
+
+  mtcute:auth:
+    desc: Authorize mtcute (Telegram MTProto) inside Docker
+    cmd: docker compose run --rm -it claudeclaw bun run src/index.ts mtcute auth
+
+  logs:
+    desc: Follow service logs
+    cmd: docker compose logs -f

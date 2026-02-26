@@ -1,9 +1,16 @@
 import { ensureProjectClaudeMd, run, runUserMessage } from "../runner";
 import { getSettings, loadSettings } from "../config";
 import { resetSession } from "../sessions";
-import { transcribeAudioToText } from "../whisper";
 import { mkdir } from "node:fs/promises";
 import { extname, join } from "node:path";
+import {
+  COMMAND_MENU,
+  handleCommand,
+  handleClearCommand,
+  handleCallback,
+  type TelegramContext,
+  type CommandResult,
+} from "../telegram/commands";
 
 // --- Markdown → Telegram HTML conversion (ported from nanobot) ---
 
@@ -139,6 +146,13 @@ interface TelegramMyChatMemberUpdate {
   new_chat_member: TelegramChatMember;
 }
 
+interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
+}
+
 interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
@@ -146,6 +160,7 @@ interface TelegramUpdate {
   channel_post?: TelegramMessage;
   edited_channel_post?: TelegramMessage;
   my_chat_member?: TelegramMyChatMemberUpdate;
+  callback_query?: TelegramCallbackQuery;
 }
 
 interface TelegramMe {
@@ -159,6 +174,7 @@ interface TelegramFile {
 }
 
 let telegramDebug = false;
+let telegramContext: TelegramContext | null = null;
 
 function debugLog(message: string): void {
   if (!telegramDebug) return;
@@ -196,6 +212,13 @@ function isImageDocument(document?: TelegramDocument): boolean {
 
 function isAudioDocument(document?: TelegramDocument): boolean {
   return Boolean(document?.mime_type?.startsWith("audio/"));
+}
+
+function isGenericDocument(document?: TelegramDocument): boolean {
+  if (!document) return false;
+  if (isImageDocument(document)) return false;
+  if (isAudioDocument(document)) return false;
+  return true;
 }
 
 function pickLargestPhoto(photo: TelegramPhotoSize[]): TelegramPhotoSize {
@@ -278,6 +301,52 @@ async function sendMessage(token: string, chatId: number, text: string): Promise
         text: normalized.slice(i, i + MAX_LEN),
       });
     }
+  }
+}
+
+async function sendMessageWithButtons(
+  token: string,
+  chatId: number,
+  text: string,
+  buttons?: { text: string; callback_data: string }[][]
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    text,
+    parse_mode: "HTML",
+  };
+  if (buttons && buttons.length > 0) {
+    body.reply_markup = { inline_keyboard: buttons };
+  }
+  try {
+    await callApi(token, "sendMessage", body);
+  } catch {
+    delete body.parse_mode;
+    await callApi(token, "sendMessage", body);
+  }
+}
+
+async function editMessageWithButtons(
+  token: string,
+  chatId: number,
+  messageId: number,
+  text: string,
+  buttons?: { text: string; callback_data: string }[][]
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: "HTML",
+  };
+  if (buttons && buttons.length > 0) {
+    body.reply_markup = { inline_keyboard: buttons };
+  }
+  try {
+    await callApi(token, "editMessageText", body);
+  } catch {
+    delete body.parse_mode;
+    await callApi(token, "editMessageText", body).catch(() => {});
   }
 }
 
@@ -405,6 +474,43 @@ async function downloadVoiceFromMessage(token: string, message: TelegramMessage)
   return localPath;
 }
 
+async function downloadDocumentFromMessage(token: string, message: TelegramMessage): Promise<string | null> {
+  const doc = isGenericDocument(message.document) ? message.document : null;
+  if (!doc) return null;
+
+  const fileMeta = await callApi<{ ok: boolean; result: TelegramFile }>(token, "getFile", { file_id: doc.file_id });
+  if (!fileMeta.ok || !fileMeta.result.file_path) return null;
+
+  const remotePath = fileMeta.result.file_path;
+  const downloadUrl = `${FILE_API_BASE}${token}/${remotePath}`;
+  const response = await fetch(downloadUrl);
+  if (!response.ok) throw new Error(`Telegram file download failed: ${response.status} ${response.statusText}`);
+
+  const dir = join(process.cwd(), ".claude", "claudeclaw", "inbox", "telegram");
+  await mkdir(dir, { recursive: true });
+
+  const ext = extname(doc.file_name ?? "") || extname(remotePath) || "";
+  const filename = `${message.chat.id}-${message.message_id}-${Date.now()}${ext}`;
+  const localPath = join(dir, filename);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  await Bun.write(localPath, bytes);
+  debugLog(`Document download: wrote ${bytes.length} bytes to ${localPath} name=${doc.file_name ?? "unknown"} mime=${doc.mime_type ?? "unknown"}`);
+  return localPath;
+}
+
+async function transcribeVoice(filePath: string): Promise<string> {
+  const sttUrl = process.env.STT_URL;
+  if (!sttUrl) throw new Error("STT_URL not configured");
+  const form = new FormData();
+  form.append("file", Bun.file(filePath));
+  form.append("temperature", "0.0");
+  form.append("response_format", "json");
+  const res = await fetch(`${sttUrl}/inference`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(`STT error: ${res.status}`);
+  const data = (await res.json()) as { text: string };
+  return data.text.trim();
+}
+
 async function handleMyChatMember(update: TelegramMyChatMemberUpdate): Promise<void> {
   const config = getSettings().telegram;
   const chat = update.chat;
@@ -454,6 +560,7 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
   const isGroup = chatType === "group" || chatType === "supergroup";
   const hasImage = Boolean((message.photo && message.photo.length > 0) || isImageDocument(message.document));
   const hasVoice = Boolean(message.voice || message.audio || isAudioDocument(message.document));
+  const hasDocument = Boolean(isGenericDocument(message.document));
 
   if (!isPrivate && !isGroup) return;
 
@@ -478,29 +585,39 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
     return;
   }
 
-  if (!text.trim() && !hasImage && !hasVoice) {
+  if (!text.trim() && !hasImage && !hasVoice && !hasDocument) {
     debugLog(`Skip message chat=${chatId} from=${userId ?? "unknown"} reason=empty_text`);
     return;
   }
 
   const command = text ? extractTelegramCommand(text) : null;
   if (command === "/start") {
-    await sendMessage(
-      config.token,
-      chatId,
-      "Hello! Send me a message and I'll respond using Claude.\nUse /reset to start a fresh session."
-    );
+    const settings = getSettings();
+    let msg = "Hello! Send me a message and I'll respond using Claude.\nUse /reset to start a fresh session.";
+    if (settings.web.enabled) {
+      const host = settings.web.host === "0.0.0.0" ? "your-server" : settings.web.host;
+      msg += `\n\nWeb dashboard: http://${host}:${settings.web.port}`;
+    }
+    await sendMessage(config.token, chatId, msg);
     return;
   }
 
-  if (command === "/reset") {
-    await resetSession();
-    await sendMessage(config.token, chatId, "Global session reset. Next message starts fresh.");
+  if (command === "/menu") {
+    const result = handleCommand("/menu", telegramContext);
+    if (result) {
+      await sendMessageWithButtons(config.token, chatId, result.text, result.buttons);
+    }
+    return;
+  }
+
+  if (command === "/clear" || command === "/reset") {
+    const result = await handleClearCommand();
+    await sendMessage(config.token, chatId, result.text);
     return;
   }
 
   const label = message.from?.username ?? String(userId ?? "unknown");
-  const mediaParts = [hasImage ? "image" : "", hasVoice ? "voice" : ""].filter(Boolean);
+  const mediaParts = [hasImage ? "image" : "", hasVoice ? "voice" : "", hasDocument ? "file" : ""].filter(Boolean);
   const mediaSuffix = mediaParts.length > 0 ? ` [${mediaParts.join("+")}]` : "";
   console.log(
     `[${new Date().toLocaleTimeString()}] Telegram ${label}${mediaSuffix}: "${text.slice(0, 60)}${text.length > 60 ? "..." : ""}"`
@@ -531,12 +648,32 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
       if (voicePath) {
         try {
           debugLog(`Voice file saved: path=${voicePath}`);
-          voiceTranscript = await transcribeAudioToText(voicePath, {
-            debug: telegramDebug,
-            log: (message) => debugLog(message),
-          });
+          voiceTranscript = await transcribeVoice(voicePath);
         } catch (err) {
           console.error(`[Telegram] Failed to transcribe voice for ${label}: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    }
+
+    let documentPath: string | null = null;
+    let documentContent: string | null = null;
+    if (hasDocument) {
+      try {
+        documentPath = await downloadDocumentFromMessage(config.token, message);
+      } catch (err) {
+        console.error(`[Telegram] Failed to download document for ${label}: ${err instanceof Error ? err.message : err}`);
+      }
+
+      if (documentPath) {
+        try {
+          const file = Bun.file(documentPath);
+          const size = file.size;
+          const MAX_FILE_SIZE = 256 * 1024; // 256 KB text limit
+          if (size <= MAX_FILE_SIZE) {
+            documentContent = await file.text();
+          }
+        } catch {
+          // binary or unreadable — will pass path only
         }
       }
     }
@@ -556,6 +693,16 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
       promptParts.push(
         "The user attached voice audio, but it could not be transcribed. Respond and ask them to resend a clearer clip."
       );
+    }
+    if (documentPath && documentContent) {
+      const docName = message.document?.file_name ?? "file";
+      promptParts.push(`File "${docName}" content:\n\`\`\`\n${documentContent}\n\`\`\``);
+    } else if (documentPath) {
+      const docName = message.document?.file_name ?? "file";
+      promptParts.push(`File path: ${documentPath}`);
+      promptParts.push(`The user attached a file "${docName}". Inspect this file directly before answering.`);
+    } else if (hasDocument) {
+      promptParts.push("The user attached a file, but downloading it failed. Ask them to resend.");
     }
     const prefixedPrompt = promptParts.join("\n");
     const result = await runUserMessage("telegram", prefixedPrompt);
@@ -599,6 +746,12 @@ async function poll(): Promise<void> {
     console.error(`[Telegram] getMe failed: ${err instanceof Error ? err.message : err}`);
   }
 
+  try {
+    await callApi(config.token, "setMyCommands", { commands: COMMAND_MENU });
+  } catch (err) {
+    console.error(`[Telegram] setMyCommands failed: ${err instanceof Error ? err.message : err}`);
+  }
+
   console.log("Telegram bot started (long polling)");
   console.log(`  Allowed users: ${config.allowedUserIds.length === 0 ? "all" : config.allowedUserIds.join(", ")}`);
   if (telegramDebug) console.log("  Debug: enabled");
@@ -608,7 +761,7 @@ async function poll(): Promise<void> {
       const data = await callApi<{ ok: boolean; result: TelegramUpdate[] }>(
         config.token,
         "getUpdates",
-        { offset, timeout: 30, allowed_updates: ["message", "my_chat_member"] }
+        { offset, timeout: 30, allowed_updates: ["message", "my_chat_member", "callback_query"] }
       );
 
       if (!data.ok || !data.result.length) continue;
@@ -634,6 +787,19 @@ async function poll(): Promise<void> {
             console.error(`[Telegram] my_chat_member unhandled: ${err}`);
           });
         }
+        if (update.callback_query) {
+          const cb = update.callback_query;
+          callApi(config.token, "answerCallbackQuery", { callback_query_id: cb.id }).catch(() => {});
+          if (cb.data && cb.message) {
+            const cbChatId = cb.message.chat.id;
+            const cbMsgId = cb.message.message_id;
+            handleCallback(cb.data, telegramContext)
+              .then((result) => editMessageWithButtons(config.token, cbChatId, cbMsgId, result.text, result.buttons))
+              .catch((err) => {
+                console.error(`[Telegram] callback error: ${err instanceof Error ? err.message : err}`);
+              });
+          }
+        }
       }
     } catch (err) {
       if (!running) break;
@@ -652,8 +818,9 @@ process.on("SIGTERM", () => { running = false; });
 process.on("SIGINT", () => { running = false; });
 
 /** Start polling in-process (called by start.ts when token is configured) */
-export function startPolling(debug = false): void {
+export function startPolling(debug = false, context?: TelegramContext): void {
   telegramDebug = debug;
+  telegramContext = context ?? null;
   (async () => {
     await ensureProjectClaudeMd();
     await poll();

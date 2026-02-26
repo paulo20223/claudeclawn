@@ -22,6 +22,9 @@ if (command === "--stop-all") {
   telegram();
 } else if (command === "send") {
   send(args.slice(1));
+} else if (command === "mtcute") {
+  const { mtcute } = await import("./commands/mtcute");
+  mtcute(args.slice(1));
 } else {
   start();
 }

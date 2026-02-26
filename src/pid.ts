@@ -28,6 +28,11 @@ export async function checkExistingDaemon(): Promise<number | null> {
 
   try {
     process.kill(pid, 0); // signal 0 = just check if alive
+    if (pid === process.pid) {
+      // Stale PID file from previous process with same PID (e.g. Docker restart, PID 1)
+      await cleanupPidFile();
+      return null;
+    }
     return pid;
   } catch {
     // process is dead, clean up stale pid file

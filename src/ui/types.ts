@@ -18,6 +18,7 @@ export interface WebServerHandle {
 export interface StartWebUiOptions {
   host: string;
   port: number;
+  token?: string;
   getSnapshot: () => WebSnapshot;
   onHeartbeatEnabledChanged?: (enabled: boolean) => void | Promise<void>;
   onHeartbeatSettingsChanged?: (patch: {
@@ -27,4 +28,5 @@ export interface StartWebUiOptions {
     excludeWindows?: Array<{ days?: number[]; start: string; end: string }>;
   }) => void | Promise<void>;
   onJobsChanged?: () => void | Promise<void>;
+  onSettingsChanged?: () => void | Promise<void>;
 }

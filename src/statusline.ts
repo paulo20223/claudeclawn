@@ -10,6 +10,7 @@ export interface StateData {
   telegram: boolean;
   startedAt: number;
   web?: { enabled: boolean; host: string; port: number };
+  mtcute?: { connected: boolean; trackedChats: number };
 }
 
 export async function writeState(state: StateData) {

@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
   },
   timezone: "UTC",
   timezoneOffsetMinutes: 0,
+  language: "Русский",
   heartbeat: {
     enabled: false,
     interval: 15,
@@ -25,7 +26,16 @@ const DEFAULT_SETTINGS: Settings = {
   },
   telegram: { token: "", allowedUserIds: [] },
   security: { level: "moderate", allowedTools: [], disallowedTools: [] },
-  web: { enabled: false, host: "127.0.0.1", port: 4632 },
+  web: { enabled: false, port: 4632 },
+  mtcute: {
+    apiId: 0,
+    apiHash: "",
+    phoneNumber: "",
+    sessionName: "claudeclaw",
+    enabled: false,
+    trackingInterval: 30,
+    trackingEnabled: false,
+  },
 };
 
 export interface HeartbeatExcludeWindow {
@@ -58,16 +68,28 @@ export interface SecurityConfig {
   disallowedTools: string[];
 }
 
+export interface MtcuteConfig {
+  apiId: number;
+  apiHash: string;
+  phoneNumber: string;
+  sessionName: string;
+  enabled: boolean;
+  trackingInterval: number;
+  trackingEnabled: boolean;
+}
+
 export interface Settings {
   model: string;
   api: string;
   fallback: ModelConfig;
   timezone: string;
   timezoneOffsetMinutes: number;
+  language: string;
   heartbeat: HeartbeatConfig;
   telegram: TelegramConfig;
   security: SecurityConfig;
   web: WebConfig;
+  mtcute: MtcuteConfig;
 }
 
 export interface ModelConfig {
@@ -87,6 +109,7 @@ export async function initConfig(): Promise<void> {
   await mkdir(HEARTBEAT_DIR, { recursive: true });
   await mkdir(JOBS_DIR, { recursive: true });
   await mkdir(LOGS_DIR, { recursive: true });
+  await mkdir(join(HEARTBEAT_DIR, "mtcute"), { recursive: true });
 
   if (!existsSync(SETTINGS_FILE)) {
     await Bun.write(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2) + "\n");
@@ -118,6 +141,7 @@ function parseSettings(raw: Record<string, any>): Settings {
     },
     timezone: parsedTimezone,
     timezoneOffsetMinutes: parseTimezoneOffsetMinutes(raw.timezoneOffsetMinutes, parsedTimezone),
+    language: typeof raw.language === "string" ? raw.language.trim() : "Русский",
     heartbeat: {
       enabled: raw.heartbeat?.enabled ?? false,
       interval: raw.heartbeat?.interval ?? 15,
@@ -139,8 +163,21 @@ function parseSettings(raw: Record<string, any>): Settings {
     },
     web: {
       enabled: raw.web?.enabled ?? false,
-      host: raw.web?.host ?? "127.0.0.1",
+      host: process.env.CLAUDECLAW_WEB_HOST ?? raw.web?.host ?? "127.0.0.1",
       port: Number.isFinite(raw.web?.port) ? Number(raw.web.port) : 4632,
+    },
+    mtcute: {
+      apiId: Number.isFinite(raw.mtcute?.apiId) ? Number(raw.mtcute.apiId) : 0,
+      apiHash: typeof raw.mtcute?.apiHash === "string" ? raw.mtcute.apiHash.trim() : "",
+      phoneNumber: typeof raw.mtcute?.phoneNumber === "string" ? raw.mtcute.phoneNumber.trim() : "",
+      sessionName: typeof raw.mtcute?.sessionName === "string" && raw.mtcute.sessionName.trim()
+        ? raw.mtcute.sessionName.trim()
+        : "claudeclaw",
+      enabled: raw.mtcute?.enabled ?? false,
+      trackingInterval: Number.isFinite(raw.mtcute?.trackingInterval)
+        ? Math.max(1, Number(raw.mtcute.trackingInterval))
+        : 30,
+      trackingEnabled: raw.mtcute?.trackingEnabled ?? false,
     },
   };
 }
@@ -192,6 +229,10 @@ export async function reloadSettings(): Promise<Settings> {
   const raw = await Bun.file(SETTINGS_FILE).json();
   cached = parseSettings(raw);
   return cached;
+}
+
+export function isConfigured(settings: Settings): boolean {
+  return settings.model !== "";
 }
 
 export function getSettings(): Settings {

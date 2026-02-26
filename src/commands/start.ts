@@ -6,7 +6,7 @@ import { writeState, type StateData } from "../statusline";
 import { cronMatches, nextCronMatch } from "../cron";
 import { clearJobSchedule, loadJobs } from "../jobs";
 import { writePidFile, cleanupPidFile, checkExistingDaemon } from "../pid";
-import { initConfig, loadSettings, reloadSettings, resolvePrompt, type HeartbeatConfig, type Settings } from "../config";
+import { initConfig, loadSettings, reloadSettings, resolvePrompt, type HeartbeatConfig, type Settings, type MtcuteConfig } from "../config";
 import { getDayAndMinuteAtOffset } from "../timezone";
 import { startWebUi, type WebServerHandle } from "../web";
 import type { Job } from "../jobs";
@@ -309,6 +309,12 @@ export async function start(args: string[] = []) {
 
   async function shutdown() {
     if (web) web.stop();
+    try {
+      const { disconnectClient } = await import("../mtcute/client");
+      await disconnectClient();
+    } catch {
+      // ignore — mtcute may not be loaded
+    }
     await teardownStatusline();
     await cleanupPidFile();
     process.exit(0);
@@ -343,7 +349,22 @@ export async function start(args: string[] = []) {
   async function initTelegram(token: string) {
     if (token && token !== telegramToken) {
       const { startPolling, sendMessage } = await import("./telegram");
-      startPolling(debugFlag);
+      startPolling(debugFlag, {
+        getSnapshot: () => ({
+          pid: process.pid,
+          startedAt: daemonStartedAt,
+          heartbeatNextAt: nextHeartbeatAt,
+          settings: currentSettings,
+          jobs: currentJobs,
+        }),
+        runJob: async (jobName) => {
+          const job = currentJobs.find((j) => j.name === jobName);
+          if (!job) throw new Error(`Job not found: ${jobName}`);
+          const prompt = await resolvePrompt(job.prompt);
+          const result = await run(job.name, prompt);
+          forwardToTelegram(job.name, result);
+        },
+      });
       telegramSend = (chatId, text) => sendMessage(token, chatId, text);
       telegramToken = token;
       console.log(`[${ts()}] Telegram: enabled`);
@@ -356,6 +377,63 @@ export async function start(args: string[] = []) {
 
   await initTelegram(currentSettings.telegram.token);
   if (!telegramToken) console.log("  Telegram: not configured");
+
+  // --- mtcute (MTProto client) ---
+  let mtcuteConnected = false;
+  let mtcuteTrackingTimer: ReturnType<typeof setInterval> | null = null;
+
+  async function initMtcute(config: MtcuteConfig) {
+    if (config.enabled && config.apiId && config.apiHash && !mtcuteConnected) {
+      try {
+        const { initClient, connectClient } = await import("../mtcute/client");
+        initClient(config);
+        await connectClient();
+        mtcuteConnected = true;
+        console.log(`[${ts()}] mtcute: connected`);
+        scheduleMtcuteTracking(config);
+      } catch (err) {
+        console.error(`[${ts()}] mtcute: failed to connect: ${err instanceof Error ? err.message : err}`);
+      }
+    } else if (!config.enabled && mtcuteConnected) {
+      await stopMtcute();
+    }
+  }
+
+  function scheduleMtcuteTracking(config: MtcuteConfig) {
+    if (mtcuteTrackingTimer) {
+      clearInterval(mtcuteTrackingTimer);
+      mtcuteTrackingTimer = null;
+    }
+    if (!config.trackingEnabled || !mtcuteConnected) return;
+
+    const intervalMs = config.trackingInterval * 60_000;
+    mtcuteTrackingTimer = setInterval(async () => {
+      try {
+        const { checkAllTrackedChats } = await import("../mtcute/tracker");
+        await checkAllTrackedChats();
+      } catch (err) {
+        console.error(`[${ts()}] mtcute tracking error: ${err instanceof Error ? err.message : err}`);
+      }
+    }, intervalMs);
+    console.log(`[${ts()}] mtcute: tracking every ${config.trackingInterval}m`);
+  }
+
+  async function stopMtcute() {
+    if (mtcuteTrackingTimer) {
+      clearInterval(mtcuteTrackingTimer);
+      mtcuteTrackingTimer = null;
+    }
+    if (mtcuteConnected) {
+      try {
+        const { disconnectClient } = await import("../mtcute/client");
+        await disconnectClient();
+      } catch {
+        // ignore
+      }
+      mtcuteConnected = false;
+      console.log(`[${ts()}] mtcute: disconnected`);
+    }
+  }
 
   function isAddrInUse(err: unknown): boolean {
     if (!err || typeof err !== "object") return false;
@@ -373,6 +451,7 @@ export async function start(args: string[] = []) {
         return startWebUi({
           host,
           port: candidatePort,
+          token: process.env.CLAUDECLAW_WEB_TOKEN || "",
           getSnapshot: () => ({
             pid: process.pid,
             startedAt: daemonStartedAt,
@@ -423,6 +502,22 @@ export async function start(args: string[] = []) {
             updateState();
             console.log(`[${ts()}] Jobs reloaded from Web UI`);
           },
+          onSettingsChanged: async () => {
+            const newSettings = await reloadSettings();
+            const hbChanged =
+              newSettings.heartbeat.enabled !== currentSettings.heartbeat.enabled ||
+              newSettings.heartbeat.interval !== currentSettings.heartbeat.interval;
+            currentSettings = newSettings;
+            if (web) {
+              currentSettings.web.enabled = true;
+              currentSettings.web.port = web.port;
+            }
+            if (hbChanged) scheduleHeartbeat();
+            await initTelegram(currentSettings.telegram.token);
+            currentJobs = await loadJobs();
+            updateState();
+            console.log(`[${ts()}] Settings updated from Web UI (setup)`);
+          },
         });
       } catch (err) {
         lastError = err;
@@ -439,6 +534,9 @@ export async function start(args: string[] = []) {
     currentSettings.web.port = web.port;
     console.log(`[${new Date().toLocaleTimeString()}] Web UI listening on http://${web.host}:${web.port}`);
   }
+
+  await initMtcute(currentSettings.mtcute);
+  if (!mtcuteConnected) console.log("  mtcute: not configured");
 
   // --- Helpers ---
   function ts() { return new Date().toLocaleTimeString(); }
@@ -599,6 +697,19 @@ export async function start(args: string[] = []) {
 
       // Telegram changes
       await initTelegram(newSettings.telegram.token);
+
+      // mtcute changes
+      const mtcuteChanged =
+        newSettings.mtcute.enabled !== currentSettings.mtcute.enabled ||
+        newSettings.mtcute.trackingEnabled !== currentSettings.mtcute.trackingEnabled ||
+        newSettings.mtcute.trackingInterval !== currentSettings.mtcute.trackingInterval ||
+        newSettings.mtcute.apiId !== currentSettings.mtcute.apiId ||
+        newSettings.mtcute.apiHash !== currentSettings.mtcute.apiHash;
+      if (mtcuteChanged) {
+        console.log(`[${ts()}] mtcute config changed — reinitializing`);
+        await stopMtcute();
+        await initMtcute(newSettings.mtcute);
+      }
     } catch (err) {
       console.error(`[${ts()}] Hot-reload error:`, err);
     }
@@ -623,6 +734,9 @@ export async function start(args: string[] = []) {
         host: currentSettings.web.host,
         port: currentSettings.web.port,
       },
+      mtcute: mtcuteConnected
+        ? { connected: true, trackedChats: 0 }
+        : undefined,
     };
     writeState(state);
   }

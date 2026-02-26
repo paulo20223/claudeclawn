@@ -210,7 +210,7 @@ async function execClaude(name: string, prompt: string): Promise<RunResult> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const logFile = join(LOGS_DIR, `${name}-${timestamp}.log`);
 
-  const { security, model, api, fallback } = getSettings();
+  const { security, model, api, fallback, language } = getSettings();
   const primaryConfig: ModelConfig = { model, api };
   const fallbackConfig: ModelConfig = {
     model: fallback?.model ?? "",
@@ -249,6 +249,8 @@ async function execClaude(name: string, prompt: string): Promise<RunResult> {
       console.error(`[${new Date().toLocaleTimeString()}] Failed to read project CLAUDE.md:`, e);
     }
   }
+
+  appendParts.push(`Always respond in ${language}. Use ${language} for all communication.`);
 
   if (security.level !== "unrestricted") appendParts.push(DIR_SCOPE_PROMPT);
   if (appendParts.length > 0) {
@@ -294,6 +296,15 @@ async function execClaude(name: string, prompt: string): Promise<RunResult> {
     } catch (e) {
       console.error(`[${new Date().toLocaleTimeString()}] Failed to parse session from Claude output:`, e);
     }
+  }
+
+  if (stdout.trim()) {
+    console.log(`\n--- [${name}] stdout ---`);
+    console.log(stdout);
+  }
+  if (stderr.trim()) {
+    console.error(`\n--- [${name}] stderr ---`);
+    console.error(stderr);
   }
 
   const result: RunResult = {

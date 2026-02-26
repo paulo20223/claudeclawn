@@ -53,6 +53,10 @@ tasks:
     desc: Authorize mtcute (Telegram MTProto) inside Docker
     cmd: docker compose run --rm -it claudeclaw bun run src/index.ts mtcute auth
 
+  deploy:
+    desc: Deploy to production server
+    cmd: ssh root@109.205.181.117 'bash -s' < .update/run.sh
+
   logs:
     desc: Follow service logs
     cmd: docker compose logs -f

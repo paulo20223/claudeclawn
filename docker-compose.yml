@@ -8,6 +8,9 @@ services:
       - ./data:/app/.claude/claudeclaw
       - ./skills:/app/skills
       - ./CLAUDE.md:/app/CLAUDE.md
+      - ./src:/app/src
+      - ./prompts:/app/prompts
+    command: ["bun", "--watch", "src/index.ts", "start", "--web", "--replace-existing"]
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - CLAUDECLAW_WEB_TOKEN=${CLAUDECLAW_WEB_TOKEN:-}

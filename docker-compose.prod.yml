@@ -15,7 +15,7 @@ services:
       - STT_URL=http://stt:8080
       - VIRTUAL_HOST=claw.tenzorro.com
       - VIRTUAL_PORT=4632
-      - LETSENCRYPT_HOST=claw.tenzorro.com
+      - HTTPS_METHOD=noredirect
     depends_on:
       stt:
         condition: service_healthy

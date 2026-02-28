@@ -9,6 +9,7 @@ export interface Job {
   prompt: string;
   recurring: boolean;
   notify: true | false | "error";
+  type: "prompt" | "script";
 }
 
 function parseFrontmatterValue(raw: string): string {
@@ -42,6 +43,17 @@ function parseJobFile(name: string, content: string): Job | null {
     : "";
   const recurring = recurringRaw === "true" || recurringRaw === "yes" || recurringRaw === "1";
 
+  const typeLine = lines.find((l) => l.startsWith("type:"));
+  const typeRaw = typeLine
+    ? parseFrontmatterValue(typeLine.replace("type:", "")).toLowerCase()
+    : "";
+  const type: "prompt" | "script" = typeRaw === "script" ? "script" : "prompt";
+
+  if (type === "script" && !prompt) {
+    console.error(`Script job has no body: ${name}`);
+    return null;
+  }
+
   const notifyLine = lines.find((l) => l.startsWith("notify:"));
   const notifyRaw = notifyLine
     ? parseFrontmatterValue(notifyLine.replace("notify:", "")).toLowerCase()
@@ -51,7 +63,7 @@ function parseJobFile(name: string, content: string): Job | null {
     : notifyRaw === "error" ? "error"
     : true;
 
-  return { name, schedule, prompt, recurring, notify };
+  return { name, schedule, prompt, recurring, notify, type };
 }
 
 export async function loadJobs(): Promise<Job[]> {

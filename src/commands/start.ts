@@ -5,6 +5,7 @@ import { run, runUserMessage, bootstrap, ensureProjectClaudeMd, loadHeartbeatPro
 import { writeState, type StateData } from "../statusline";
 import { cronMatches, nextCronMatch } from "../cron";
 import { clearJobSchedule, loadJobs } from "../jobs";
+import { loadSkills } from "../skills";
 import { writePidFile, cleanupPidFile, checkExistingDaemon } from "../pid";
 import { initConfig, loadSettings, reloadSettings, resolvePrompt, type HeartbeatConfig, type Settings, type MtcuteConfig } from "../config";
 import { getDayAndMinuteAtOffset } from "../timezone";
@@ -300,6 +301,7 @@ export async function start(args: string[] = []) {
   const settings = await loadSettings();
   await ensureProjectClaudeMd();
   const jobs = await loadJobs();
+  const skills = await loadSkills();
   const webEnabled = webFlag || webPortFlag !== null || settings.web.enabled;
   const webPort = webPortFlag ?? settings.web.port;
 
@@ -338,6 +340,7 @@ export async function start(args: string[] = []) {
   // --- Mutable state ---
   let currentSettings: Settings = settings;
   let currentJobs: Job[] = jobs;
+  let currentSkills = skills;
   let nextHeartbeatAt = 0;
   let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   const daemonStartedAt = Date.now();
@@ -356,13 +359,19 @@ export async function start(args: string[] = []) {
           heartbeatNextAt: nextHeartbeatAt,
           settings: currentSettings,
           jobs: currentJobs,
+          skills: currentSkills,
         }),
         runJob: async (jobName) => {
           const job = currentJobs.find((j) => j.name === jobName);
           if (!job) throw new Error(`Job not found: ${jobName}`);
-          const prompt = await resolvePrompt(job.prompt);
-          const result = await run(job.name, prompt);
-          forwardToTelegram(job.name, result);
+          if (job.type === "script") {
+            const result = await execScript(job.prompt);
+            forwardToTelegram(job.name, result);
+          } else {
+            const prompt = await resolvePrompt(job.prompt);
+            const result = await run(job.name, prompt);
+            forwardToTelegram(job.name, result);
+          }
         },
       });
       telegramSend = (chatId, text) => sendMessage(token, chatId, text);
@@ -567,6 +576,20 @@ export async function start(args: string[] = []) {
     }
   }
 
+  async function execScript(script: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    const proc = Bun.spawn(["sh", "-c", script], {
+      stdout: "pipe",
+      stderr: "pipe",
+      cwd: process.cwd(),
+    });
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    return { exitCode, stdout, stderr };
+  }
+
   // --- Heartbeat scheduling ---
   function scheduleHeartbeat() {
     if (heartbeatTimer) clearTimeout(heartbeatTimer);
@@ -654,6 +677,7 @@ export async function start(args: string[] = []) {
     try {
       const newSettings = await reloadSettings();
       const newJobs = await loadJobs();
+      currentSkills = await loadSkills();
 
       // Detect heartbeat config changes
       const hbChanged =
@@ -747,8 +771,10 @@ export async function start(args: string[] = []) {
     const now = new Date();
     for (const job of currentJobs) {
       if (cronMatches(job.schedule, now, currentSettings.timezoneOffsetMinutes)) {
-        resolvePrompt(job.prompt)
-          .then((prompt) => run(job.name, prompt))
+        const exec = job.type === "script"
+          ? execScript(job.prompt)
+          : resolvePrompt(job.prompt).then((prompt) => run(job.name, prompt));
+        exec
           .then((r) => {
             if (job.notify === false) return;
             if (job.notify === "error" && r.exitCode === 0) return;

@@ -1,5 +1,6 @@
 import type { Settings } from "../config";
 import type { Job } from "../jobs";
+import type { Skill } from "../skills";
 
 export interface WebSnapshot {
   pid: number;
@@ -7,6 +8,7 @@ export interface WebSnapshot {
   heartbeatNextAt: number;
   settings: Settings;
   jobs: Job[];
+  skills: Skill[];
 }
 
 export interface WebServerHandle {

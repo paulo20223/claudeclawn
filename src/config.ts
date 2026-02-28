@@ -1,5 +1,5 @@
 import { join, isAbsolute } from "path";
-import { mkdir } from "fs/promises";
+import { mkdir, readdir } from "fs/promises";
 import { existsSync } from "fs";
 import { normalizeTimezoneName, resolveTimezoneOffsetMinutes } from "./timezone";
 
@@ -113,6 +113,23 @@ export async function initConfig(): Promise<void> {
 
   if (!existsSync(SETTINGS_FILE)) {
     await Bun.write(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2) + "\n");
+  }
+
+  await installPresetJobs(JOBS_DIR);
+}
+
+async function installPresetJobs(jobsDir: string): Promise<void> {
+  const presetsDir = join(import.meta.dir, "..", "presets", "jobs");
+  let presets: string[];
+  try {
+    presets = (await readdir(presetsDir)).filter(f => f.endsWith(".md"));
+  } catch { return; }
+
+  for (const file of presets) {
+    const dest = join(jobsDir, file);
+    if (existsSync(dest)) continue;
+    const content = await Bun.file(join(presetsDir, file)).text();
+    await Bun.write(dest, content);
   }
 }
 

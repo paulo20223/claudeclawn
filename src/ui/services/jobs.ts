@@ -7,6 +7,7 @@ export interface QuickJobInput {
   prompt?: unknown;
   recurring?: unknown;
   daily?: unknown;
+  type?: unknown;
 }
 
 export async function createQuickJob(input: QuickJobInput): Promise<{ name: string; schedule: string; recurring: boolean }> {
@@ -15,6 +16,7 @@ export async function createQuickJob(input: QuickJobInput): Promise<{ name: stri
   const recurring = input.recurring == null
     ? (input.daily == null ? true : Boolean(input.daily))
     : Boolean(input.recurring);
+  const jobType = input.type === "script" ? "script" : "prompt";
 
   if (!/^\d{2}:\d{2}$/.test(time)) {
     throw new Error("Invalid time. Use HH:MM.");
@@ -36,7 +38,8 @@ export async function createQuickJob(input: QuickJobInput): Promise<{ name: stri
   const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
   const name = `quick-${stamp}-${hour.toString().padStart(2, "0")}${minute.toString().padStart(2, "0")}`;
   const path = join(JOBS_DIR, `${name}.md`);
-  const content = `---\nschedule: "${schedule}"\nrecurring: ${recurring ? "true" : "false"}\n---\n${prompt}\n`;
+  const typeLine = jobType === "script" ? `type: script\n` : "";
+  const content = `---\nschedule: "${schedule}"\n${typeLine}recurring: ${recurring ? "true" : "false"}\n---\n${prompt}\n`;
 
   await mkdir(JOBS_DIR, { recursive: true });
   await writeFile(path, content, "utf-8");

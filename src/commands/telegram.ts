@@ -7,6 +7,7 @@ import {
   COMMAND_MENU,
   handleCommand,
   handleClearCommand,
+  handleTodayTasks,
   handleCallback,
   type TelegramContext,
   type CommandResult,
@@ -173,6 +174,14 @@ interface TelegramFile {
   file_path?: string;
 }
 
+interface PendingAsk {
+  options: string[];
+  createdAt: number;
+}
+
+let askCounter = 0;
+const pendingAsks = new Map<string, PendingAsk>(); // "chatId:counter" -> options
+
 let telegramDebug = false;
 let telegramContext: TelegramContext | null = null;
 
@@ -283,23 +292,43 @@ async function callApi<T>(token: string, method: string, body?: Record<string, u
   return (await res.json()) as T;
 }
 
-async function sendMessage(token: string, chatId: number, text: string): Promise<void> {
+async function sendMessage(
+  token: string,
+  chatId: number,
+  text: string,
+  buttons?: InlineButton[][]
+): Promise<void> {
   const normalized = normalizeTelegramText(text).replace(/\[react:[^\]\r\n]+\]/gi, "");
   const html = markdownToTelegramHtml(normalized);
   const MAX_LEN = 4096;
+  const chunks: string[] = [];
+  const plainChunks: string[] = [];
   for (let i = 0; i < html.length; i += MAX_LEN) {
-    try {
-      await callApi(token, "sendMessage", {
-        chat_id: chatId,
-        text: html.slice(i, i + MAX_LEN),
-        parse_mode: "HTML",
-      });
-    } catch {
-      // Fallback to plain text if HTML parsing fails
-      await callApi(token, "sendMessage", {
-        chat_id: chatId,
-        text: normalized.slice(i, i + MAX_LEN),
-      });
+    chunks.push(html.slice(i, i + MAX_LEN));
+    plainChunks.push(normalized.slice(i, i + MAX_LEN));
+  }
+  if (chunks.length === 0) {
+    chunks.push(html);
+    plainChunks.push(normalized);
+  }
+  for (let i = 0; i < chunks.length; i++) {
+    const isLast = i === chunks.length - 1;
+    const chunkButtons = isLast ? buttons : undefined;
+    if (chunkButtons && chunkButtons.length > 0) {
+      await sendMessageWithButtons(token, chatId, chunks[i], chunkButtons);
+    } else {
+      try {
+        await callApi(token, "sendMessage", {
+          chat_id: chatId,
+          text: chunks[i],
+          parse_mode: "HTML",
+        });
+      } catch {
+        await callApi(token, "sendMessage", {
+          chat_id: chatId,
+          text: plainChunks[i],
+        });
+      }
     }
   }
 }
@@ -341,6 +370,8 @@ async function editMessageWithButtons(
   };
   if (buttons && buttons.length > 0) {
     body.reply_markup = { inline_keyboard: buttons };
+  } else {
+    body.reply_markup = { inline_keyboard: [] };
   }
   try {
     await callApi(token, "editMessageText", body);
@@ -366,6 +397,45 @@ function extractReactionDirective(text: string): { cleanedText: string; reaction
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return { cleanedText, reactionEmoji };
+}
+
+type InlineButton = { text: string; callback_data: string };
+
+function extractButtonsDirective(
+  text: string,
+  chatId: number
+): { cleanedText: string; buttons: InlineButton[][] | null } {
+  const match = text.match(/\[buttons\]\n([\s\S]*?)\n?\[\/buttons\]/i);
+  if (!match) return { cleanedText: text, buttons: null };
+
+  const counter = ++askCounter;
+  const key = `${chatId}:${counter}`;
+  const lines = match[1].split("\n").filter((l) => l.trim());
+  const options: string[] = [];
+  const keyboard: InlineButton[][] = [];
+
+  for (const line of lines) {
+    const row: InlineButton[] = [];
+    for (const label of line.split("|").map((s) => s.trim()).filter(Boolean)) {
+      const idx = options.length;
+      options.push(label);
+      row.push({ text: label, callback_data: `ask:${counter}:${idx}` });
+    }
+    if (row.length) keyboard.push(row);
+  }
+
+  // "Другое..." button on its own row
+  keyboard.push([{ text: "Другое...", callback_data: `ask:${counter}:other` }]);
+
+  pendingAsks.set(key, { options, createdAt: Date.now() });
+
+  const cleanedText = text
+    .replace(/\[buttons\]\n[\s\S]*?\n?\[\/buttons\]/i, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return { cleanedText, buttons: keyboard };
 }
 
 async function sendReaction(token: string, chatId: number, messageId: number, emoji: string): Promise<void> {
@@ -511,6 +581,78 @@ async function transcribeVoice(filePath: string): Promise<string> {
   return data.text.trim();
 }
 
+async function handleAskCallback(
+  token: string,
+  chatId: number,
+  messageId: number,
+  data: string,
+  from: TelegramUser,
+  originalText?: string
+): Promise<void> {
+  const parts = data.split(":");
+  const counter = parts[1];
+  const choice = parts[2];
+  const key = `${chatId}:${counter}`;
+  const pending = pendingAsks.get(key);
+
+  if (!pending) {
+    // Expired or unknown — just remove the keyboard
+    if (originalText) {
+      await editMessageWithButtons(token, chatId, messageId, originalText);
+    }
+    return;
+  }
+
+  if (choice === "other") {
+    // Remove buttons, prompt user to type
+    const updatedText = (originalText ?? "") + "\n\n<i>Напишите свой вариант...</i>";
+    await editMessageWithButtons(token, chatId, messageId, updatedText);
+    pendingAsks.delete(key);
+    return;
+  }
+
+  const idx = parseInt(choice, 10);
+  const selected = pending.options[idx];
+  if (!selected) {
+    if (originalText) {
+      await editMessageWithButtons(token, chatId, messageId, originalText);
+    }
+    pendingAsks.delete(key);
+    return;
+  }
+
+  // Update message to show selection
+  const updatedText = (originalText ?? "") + `\n\n→ <b>${selected}</b>`;
+  await editMessageWithButtons(token, chatId, messageId, updatedText);
+  pendingAsks.delete(key);
+
+  // Send choice to Claude
+  const typingInterval = setInterval(() => sendTyping(token, chatId), 4000);
+  try {
+    await sendTyping(token, chatId);
+    const label = from.username ?? String(from.id);
+    const prompt = `[Telegram from ${label}]\nMessage: ${selected}`;
+    const result = await runUserMessage("telegram", prompt);
+
+    if (result.exitCode !== 0) {
+      await sendMessage(token, chatId, `Error (exit ${result.exitCode}): ${result.stderr || "Unknown error"}`);
+    } else {
+      const { cleanedText: afterReact, reactionEmoji } = extractReactionDirective(result.stdout || "");
+      if (reactionEmoji) {
+        await sendReaction(token, chatId, messageId, reactionEmoji).catch(() => {});
+      }
+      const { cleanedText, buttons } = extractButtonsDirective(afterReact, chatId);
+      await sendMessage(token, chatId, cleanedText || "(empty response)", buttons ?? undefined);
+    }
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[Telegram] Ask callback error: ${errMsg}`);
+    await sendMessage(token, chatId, `Error: ${errMsg}`);
+  } finally {
+    clearInterval(typingInterval);
+  }
+}
+
 async function handleMyChatMember(update: TelegramMyChatMemberUpdate): Promise<void> {
   const config = getSettings().telegram;
   const chat = update.chat;
@@ -616,6 +758,12 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
     return;
   }
 
+  if (command === "/today_tasks" || command === "/today-tasks") {
+    const result = await handleTodayTasks();
+    await sendMessage(config.token, chatId, result.text);
+    return;
+  }
+
   const label = message.from?.username ?? String(userId ?? "unknown");
   const mediaParts = [hasImage ? "image" : "", hasVoice ? "voice" : "", hasDocument ? "file" : ""].filter(Boolean);
   const mediaSuffix = mediaParts.length > 0 ? ` [${mediaParts.join("+")}]` : "";
@@ -710,13 +858,14 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
     if (result.exitCode !== 0) {
       await sendMessage(config.token, chatId, `Error (exit ${result.exitCode}): ${result.stderr || "Unknown error"}`);
     } else {
-      const { cleanedText, reactionEmoji } = extractReactionDirective(result.stdout || "");
+      const { cleanedText: afterReact, reactionEmoji } = extractReactionDirective(result.stdout || "");
       if (reactionEmoji) {
         await sendReaction(config.token, chatId, message.message_id, reactionEmoji).catch((err) => {
           console.error(`[Telegram] Failed to send reaction for ${label}: ${err instanceof Error ? err.message : err}`);
         });
       }
-      await sendMessage(config.token, chatId, cleanedText || "(empty response)");
+      const { cleanedText, buttons } = extractButtonsDirective(afterReact, chatId);
+      await sendMessage(config.token, chatId, cleanedText || "(empty response)", buttons ?? undefined);
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -793,12 +942,24 @@ async function poll(): Promise<void> {
           if (cb.data && cb.message) {
             const cbChatId = cb.message.chat.id;
             const cbMsgId = cb.message.message_id;
-            handleCallback(cb.data, telegramContext)
-              .then((result) => editMessageWithButtons(config.token, cbChatId, cbMsgId, result.text, result.buttons))
-              .catch((err) => {
-                console.error(`[Telegram] callback error: ${err instanceof Error ? err.message : err}`);
+            if (cb.data.startsWith("ask:")) {
+              handleAskCallback(config.token, cbChatId, cbMsgId, cb.data, cb.from, cb.message.text).catch((err) => {
+                console.error(`[Telegram] ask callback error: ${err instanceof Error ? err.message : err}`);
               });
+            } else {
+              handleCallback(cb.data, telegramContext)
+                .then((result) => editMessageWithButtons(config.token, cbChatId, cbMsgId, result.text, result.buttons))
+                .catch((err) => {
+                  console.error(`[Telegram] callback error: ${err instanceof Error ? err.message : err}`);
+                });
+            }
           }
+        }
+
+        // Cleanup expired pendingAsks (TTL 1 hour)
+        const now = Date.now();
+        for (const [k, v] of Array.from(pendingAsks.entries())) {
+          if (now - v.createdAt > 3600_000) pendingAsks.delete(k);
         }
       }
     } catch (err) {

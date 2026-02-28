@@ -49,7 +49,7 @@ tasks:
     desc: Stop service
     cmd: docker compose down
 
-  mtcute:auth:
+  tg:auth:
     desc: Authorize mtcute (Telegram MTProto) inside Docker
     cmd: docker compose run --rm -it claudeclaw bun run src/index.ts mtcute auth
 

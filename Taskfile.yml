@@ -51,7 +51,7 @@ tasks:
 
   tg:auth:
     desc: Authorize mtcute (Telegram MTProto) inside Docker
-    cmd: docker compose run --rm -it claudeclaw bun run src/index.ts mtcute auth
+    cmd: docker compose exec claudeclaw bun run src/index.ts mtcute auth
 
   deploy:
     desc: Deploy to production server

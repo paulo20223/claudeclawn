@@ -1,0 +1,51 @@
+services:
+  bot:
+    build: .
+    expose: [ "4632" ]
+    volumes:
+      - ./claude-home:/home/claw/.claude
+      - ./data:/app/.claude/claudeclaw
+      - ./skills:/app/skills
+      - ./skills:/app/.claude/skills
+      - ./CLAUDE.md:/app/CLAUDE.md
+    command: [ "bun", "run", "src/index.ts", "start", "--web" ]
+    env_file: [ .env.claw ]
+    environment:
+      - CLAUDECLAW_WEB_TOKEN=${CLAUDECLAW_WEB_TOKEN:-}
+      - STT_URL=http://stt:8080
+      - MTCUTE_URL=http://tg:3000
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - VIRTUAL_PORT=4632
+      - HTTPS_METHOD=noredirect
+    depends_on: [ tg, stt ]
+    networks:
+      - proxy
+      - default
+    restart: unless-stopped
+
+  tg:
+    build: .
+    command: [ "bun", "run", "src/mtcute/server.ts" ]
+    volumes: [ ./data:/app/.claude/claudeclaw ]
+    environment:
+      - MTCUTE_API_ID=${MTCUTE_API_ID:-}
+      - MTCUTE_API_HASH=${MTCUTE_API_HASH:-}
+      - MTCUTE_SESSION_NAME=claudeclaw
+    restart: unless-stopped
+
+  stt:
+    image: ghcr.io/ggml-org/whisper.cpp:main
+    platform: linux/amd64
+    entrypoint: [ "/bin/sh", "/stt-entrypoint.sh" ]
+    volumes:
+      - ./stt-entrypoint.sh:/stt-entrypoint.sh:ro
+      - whisper-models:/models
+    restart: unless-stopped
+
+volumes:
+  whisper-models:
+
+networks:
+  proxy:
+    external: true
+    name: nginx-proxy
